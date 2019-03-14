@@ -1,0 +1,600 @@
+
+-- Question 1, Valid Student Number and Valid Call Number
+
+
+-- Part 1) Check for the valid student
+
+set serveroutout on;
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+create or replace procedure CheckStudent(
+	p_snum IN students.snum%type,
+	p_Err_Msg OUT varchar2) as
+	v_count number;
+begin
+	select count(*) into v_count
+	from students
+	where snum = p_snum;
+	
+	IF v_count = 1 then
+		p_Err_Msg := null;
+	ELSE
+		p_Err_Msg := 'Student does not exist.';
+	END IF;
+end;
+/
+
+
+/* This is a test for CheckStudent */
+/*
+
+set serveroutput on;
+
+declare
+	p_Err_Msg varchar2(700);
+begin
+	CheckStudent(166,p_Err_Msg);
+	dbms_output.put_line(p_Err_Msg);
+end;
+/
+
+
+*/
+/* This is a test for Check Student */
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+--PART 2) Check for valid call number
+
+
+set serveroutput on;
+create or replace procedure CheckCall(
+	p_callnum IN schclasses.callnum%type,
+	p_Err_Msg OUT varchar2) as
+	v_count number;
+begin
+	select count(*) into v_count
+	from schclasses
+	where callnum = p_callnum;
+	
+	IF v_count = 1 then
+		p_Err_Msg := null;
+	ELSE
+		p_Err_Msg :='Callnum does not exist.';
+	END IF;
+end;
+/
+
+/* This is a test for VALIDCALLNUM */
+/*
+
+set serveroutput on;
+
+declare
+	p_Err_Msg varchar2(700);
+begin
+	CheckCall(10110,p_Err_Msg);
+	dbms_output.put_line(p_Err_Msg);
+end;
+/
+
+
+*/
+/* This is a test for VALIDCALLNUM */
+
+
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+--2) Repeat Enrollment Procedure
+
+create or replace procedure Repeat_Enrollment(
+	p_snum IN students.snum%type,
+	p_callnum IN schclasses.callnum%type,
+	p_Err_Msg OUT varchar2) as
+	
+	v_count number;
+	
+begin
+	select count(*) into v_count
+	from enrollments
+	where snum = p_snum and callnum = p_callnum;
+	
+	if v_count = 1 then
+		p_Err_Msg := 'Student already enrolled in this class, cannot repeat enroll';
+	else
+		p_Err_Msg := null;
+	end if;
+end;
+/
+
+
+/* A test for REPEAT ENROLLMENT */
+declare
+	p_answer varchar2(700);
+begin
+	double_enrollment(101,10120,p_Err_Msg);
+	dbms_output.put_line(p_Err_Msg);
+end;
+/
+
+/* A test for REPEAT ENROLLMENT */
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+--3) Double Enrollment Procedure
+
+create or replace procedure Double_Enrollment(
+	p_snum IN schclasses.callnum%type,
+	p_callnum IN students.snum%type,
+	p_Err_Msg OUT varchar2) as
+	v_callnum schclasses.callnum%type;
+	v_dept schclasses.dept%type;
+	v_cnum schclasses.cnum%type;
+	v_section schclasses.section%type; 
+	v_count number;
+	
+begin
+	--find dept and cnum student wants to take
+	select dept, cnum
+	into v_dept, v_cnum
+	from schclasses
+	where callnum = p_callnum;
+	
+	--get the section that the student wants to take
+	select section into v_section
+	from schclasses, enrollments
+	where schclasses.CALLNUM=enrollments.CALLNUM
+	and p_snum = enrollments.snum
+        and v_dept = schclasses.dept
+	and v_cnum = schclasses.cnum;
+	
+	--count to see if the student is in the same class but different sections
+	select count(*) into v_count
+        from enrollments, schclasses
+        where enrollments.callnum = schclasses.callnum
+        and dept=v_dept
+        and cnum=v_cnum
+        and snum=p_snum;
+
+        if v_count != 0 then
+        p_Err_Msg := 'You are already enrolled in this class ' || v_dept || v_cnum || ' in section ' || v_section || '. ';
+        --dbms_output.put_line(p_err_msg);
+
+	else
+	p_Err_Msg := null;
+	end if;
+
+	exception
+	when others then
+	null;
+end;
+/
+
+
+/* A test for DOUBLE ENROLLMENT */
+/*
+declare
+	p_answer varchar2(700);
+begin
+	double_enrollment(101,10115,p_answer);
+	dbms_output.put_line(p_answer);
+end;
+/
+
+*/
+/* A test for DOUBLE ENROLLMENT! */
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+--4) 15-Hour Rule Procedure
+
+set serveroutput on;
+Create or replace procedure CreditHours(
+	p_Snum IN students.snum%type,
+	p_callnum IN schclasses.callnum%type,
+	p_Err_Msg OUT varchar2) as
+	v_Existing_CrHr Number;
+	v_ToAdd_CrHr Number;
+begin
+	--find existing CrHr
+	select (nvl(sum(crHr) ,0)) into v_Existing_CrHr
+	from enrollments e, schclasses sch, courses c
+	where e.snum = p_snum
+	and e.callnum = sch.callnum
+	and sch.dept = c.dept 
+	and sch.cnum = c.cnum;
+
+	--Find CrHr to add
+	select CrHr into v_ToAdd_CrHr
+	from schclasses sch, courses c
+	where sch.callnum = p_callnum
+	and sch.dept = c.dept
+	and sch.cnum = c.cnum;
+	
+	IF v_Existing_CrHr + v_ToAdd_CrHr <= 15 then
+		p_Err_Msg := null;
+	ELSE
+		p_Err_Msg := 'The student has surpased the allowable credit hours. ';
+
+	END IF;
+end;
+/
+
+
+/* This is a test for 15 HOUR RULE */
+/*
+
+set serveroutput on;
+
+declare
+	p_Err_Msg varchar2(700);
+begin
+	CreditHours(105,10110,p_Err_Msg);
+	dbms_output.put_line(p_Err_Msg);
+end;
+/
+
+
+*/
+/* This is a test for 15 HOUR RULE */
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+--5) Standing Requirement Procedure
+
+create or replace procedure Standing(
+	p_Snum IN students.snum%type,
+	p_Callnum IN schclasses.callnum%type,
+	p_Err_Msg OUT varchar2) as
+	
+	v_Stand number(5);
+	v_classStand number(5);
+begin
+--check student standing
+	select standing into v_stand
+	from students
+	where snum = p_snum;
+--check class standing requirement
+	select standing into v_classStand
+	from courses c, schclasses sc
+	where c.cnum = sc.cnum and c.dept = sc.dept
+	and sc.callnum = p_callnum;
+	
+	if v_stand < v_classStand then
+		p_Err_Msg := 'The students standing is lower than the class standing requirement.';
+	else
+		p_Err_Msg := null;
+	end if;
+end;
+/
+
+
+/* This is a test for STANDING */
+/*
+
+set serveroutput on;
+
+declare
+	p_Err_Msg varchar2(700);
+begin
+	Standing(105,10110,p_Err_Msg);
+	dbms_output.put_line(p_Err_Msg);
+end;
+/
+
+*/
+/* This is a test for STANDING */
+
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+--6) Disqualified Student Procedure
+
+create or replace procedure Student_Disqualified(
+	p_Snum students.snum%type,
+	p_Err_Msg OUT varchar2) as
+	
+	v_Standing number;
+	v_GPA number;
+begin
+	select standing into v_standing
+	from students
+	where snum = p_snum;
+	
+	select gpa into v_gpa
+	from students
+	where snum = p_snum;
+	
+	if v_standing = 1 then
+		p_Err_Msg := null;
+	else
+		if v_GPA < 2 then
+			p_Err_Msg := 'The Student cannot enroll due to GPA restrictions.';
+		else
+			p_Err_Msg := null;
+		end if;
+	end if;
+end;
+/
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+--7) Capacity Procedure
+
+set serveroutput on;
+create or replace procedure CheckAvailability(
+	p_snum IN students.snum%type,
+	p_Callnum IN schclasses.callnum%type,
+	p_Err_Msg OUT varchar2) as
+
+	v_capacity number(6);
+	v_Current_Capacity number(6);
+
+begin
+	--Get the enrollment capacity
+	select capacity into v_capacity
+	from schclasses sch
+	where p_callnum = sch.callnum;
+	
+	--Get the current capacity
+	select count(e.callnum) into v_Current_Capacity
+	from enrollments e
+	where p_callnum = e.callnum;
+
+	IF v_Current_Capacity >= v_Capacity THEN		
+		p_Err_Msg := 'Sorry, the student cannot enroll in this course due to capacity restrictions,';
+	ELSE
+		p_Err_Msg := null;
+	END IF;
+end;
+/ 
+
+/* This is a test for CHECKAVAILABILITY */
+/*
+
+declare
+	p_Err_Msg varchar2(700);
+begin
+	CheckAvailability(104,10135,p_Err_Msg);
+	dbms_output.put_line(p_Err_Msg);
+end;
+/
+
+*/
+/* This is a test for CHECKAVAILABILITY */
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+--8) Wait List Procedure
+
+
+
+Create or replace procedure WaitList(
+	p_Snum IN Students.Snum%type,
+	P_CallNum IN Schclasses.callnum%type) as
+		
+
+	
+	
+begin
+	insert into waitinglist values(p_snum,p_callnum,sysdate);
+end;
+/
+
+execute WaitList(104,10135);
+execute WaitList(106,10135);
+select * from waitinglist;
+
+--Each time you add somebody to waitinglist the amount of times the person is put on the waitinglist doubles. 
+truncate table waitinglist;
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- 10) The final big guy
+
+alter session set NLS_DATE_FORMAT = 'mm-dd-yyy HH24:mi:ss';
+
+Create or replace procedure AddMe(
+	p_Snum IN students.snum%type,
+	p_CallNum IN Schclasses.callnum%type,
+	p_Err_Msg OUT varchar2) as
+	v_Err_Msg varchar2(300);
+	v_Err_Txt varchar2(300);
+	v_Rank number(5);
+
+begin
+	
+	v_Rank := 1;
+	--check for valid student and class
+	CheckStudent(p_snum, V_Err_Txt);
+	v_Err_Msg := v_Err_Txt;
+	CheckCall(p_callnum, v_err_txt);
+	v_Err_Msg := v_err_msg||v_err_txt;
+	
+	--Check repeat enrollment and double enrollment
+	IF v_Err_Msg is not null then 
+		dbms_output.put_line(v_Err_Msg);
+	ELSE
+		Repeat_Enrollment(p_Snum, p_Callnum, v_Err_Msg);
+		v_Err_Msg := v_Err_Txt;
+		
+		Double_Enrollment(p_Snum, p_Callnum, v_Err_Msg);
+		v_Err_Msg := v_Err_Msg||v_Err_Txt;
+			
+			IF v_Err_Msg is not null then
+				dbms_output.put_line(v_Err_Msg);
+			ELSE
+				CreditHours(p_Snum, p_Callnum, v_Err_Txt); 
+				v_Err_Msg := v_Err_Txt;
+		 		
+				Standing(p_Snum, p_Callnum, v_Err_Txt);
+				v_Err_Msg :=v_Err_Msg||v_Err_Txt;
+					
+					IF v_Err_Msg is not null then
+						dbms_output.put_line(v_Err_Msg);
+					ELSE
+						Student_Disqualified(p_snum, v_Err_Txt);
+						dbms_output.put_line(v_Err_Txt);
+--Check Standing
+--If the student is qualified then run Check Capacity
+							If v_Err_Txt is null then
+								--needs an else statement
+								--Time to check capacity	
+--Capacity, student is qualified
+								CheckAvailability(p_Snum,p_Callnum,v_Err_Txt);
+								--If v_err_txt is still null then check for repeat waitlist 
+--If the class is full then display error txt from CheckAvailablity
+--If the class is full then v_Err_Txt = "Sorry, you cant enroll...."
+									If v_Err_Txt is null then
+-- There is room in the class
+										insert into enrollments values (p_snum, p_callnum, null);
+										dbms_output.put_line('Congrats, student '||p_snum||' has successfully been enrolled into '||p_callnum);
+													
+									ELSE
+--At this point v_Err_Txt = "Sorry, you cant enroll...."
+										RepeatWaitlist(p_snum,p_callnum,v_err_Msg);
+											IF v_Err_Msg is null then
+--Loop the WaitList to get proper rank, ordered by time inserted
+												dbms_output.put_line(v_err_txt);
+
+												WaitList(p_Snum, p_Callnum);
+												dbms_output.put_line('therefore student '||p_snum||' has been put on the waiting list for class '|| p_callnum||'. Thank you.' );
+--Since the class is full check for WaitList if the student is not on the waitlist put him on the wait list
+												p_err_Msg := null;
+											ELSE
+												dbms_output.put_line(v_err_Txt);
+												dbms_output.put_line(v_err_Msg);
+											end if;	
+						
+									end if;
+							end if;	
+					end if;
+			end if;
+	end if;
+end;
+/
+
+/* This is a test for AddMe */
+
+execute addme(106,10135);
+execute addme(104,10135);
+select * from waitinglist;
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+--9) Repeat Waitlist Procedure
+
+create or replace procedure RepeatWaitlist(
+		p_Snum IN students.snum%type,
+		p_Callnum IN schclasses.callnum%type,
+		p_Err_Msg OUT varchar2) as
+		
+		v_Err_Txt varchar2(300);
+		v_Count_Snum number(3);
+		v_Count_Callnum number(3);
+begin
+	select count(snum) into v_count_Snum
+	from WaitingList
+	where Snum = p_Snum
+	and Callnum = p_CallNum;
+
+	select count(callnum) into v_count_CallNum
+	from waitinglist
+	where snum = p_snum
+	and callnum = p_callnum;
+	
+	-- If the number is discovered not zero then the student is on the WaitList
+	IF v_Count_Snum + v_Count_Callnum != 0 then
+		p_Err_Msg := 'and the student is already on the waiting list.';
+	ElSE
+		p_Err_Msg := null;
+	end if;
+end;
+/
+
+--It seems like it returns null initally here because it is counting rank and sysdate which doesnt go into v_count
+because it doesn't exist. 
+
+
+
+/* This is a test for RepeatWaitList */
+
+
+set serveroutput on;
+declare
+	p_err_txt varchar2(700);
+begin
+	RepeatWaitList(104,10135,p_Err_Txt);
+	dbms_output.put_line(p_Err_Txt);
+end;
+/
+
+set serveroutput on;
+declare
+	p_err_txt varchar2(700);
+begin
+	RepeatWaitList(102,10110,p_Err_txt);
+	dbms_output.put_line(p_Err_txt);
+end;
+/
+
+
+/* Above is a test for RepeatWaitList */
+
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+/* Trash later
+
+--10) Main May not be used and subbed for the WaitList procedure
+
+
+set serveroutput on;
+Create or replace procedure AddMe(
+	p_snum students.snum%type,
+	p_callnum schclasses.callnum%type) as
+	v_err_msg varchar2(2000);
+	v_err_txt varchar2(2000);
+begin
+	CheckStudent(p_snum, v_err_txt);
+	v_Err_Msg := v_err_txt;
+	CheckCall(p_callnum, v_err_txt);
+	v_Err_Msg := v_Err_Msg||v_err_txt;
+
+	IF v_err_msg is not null then
+		dbms_output.put_line(v_err_msg);
+		
+	ELSE
+		CheckAvailability(p_snum, p_callnum, v_err_txt);
+		v_Err_Msg := v_err_txt;
+	
+		CreditHours(p_snum, p_callnum, v_err_txt);
+		v_Err_Msg := v_err_msg||v_err_txt;
+		
+		IF v_Err_Msg is null THEN
+			insert into enrollments values(p_snum, p_callnum, null);
+			dbms_output.put_line('Congrats, the student has added the class.');			
+		ELSE
+			dbms_output.put_line(v_err_msg);
+		END IF;
+	dbms_output.put_line(v_err_msg);
+	END IF;
+end;
+/
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
